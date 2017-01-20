@@ -1,5 +1,18 @@
 ---
 - hosts: localhost
   remote_user: root
+  gather_facts: no
+
+  vars:
+    do_keys:
+      - name: admin@example.com
+        pub_key_file: "~/.ssh/id_rsa.pub"
+    do_droplets:
+      - name: example.com
+        port: 4222
+        user: admin
+        ssh_key_name: admin@example.com
+    do_inventory_file: ~/.ansible/hosts
+
   roles:
-    - ansible-role-do-droplets
+    - ../../

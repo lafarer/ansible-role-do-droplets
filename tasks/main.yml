@@ -1,0 +1,96 @@
+---
+- name: "Add SSH key"
+  digital_ocean:
+    state: present
+    command: ssh
+    name: "{{ item.name }}"
+    ssh_pub_key: "{{ lookup('file', item.pub_key_file) }}"
+  register: ssh_keys
+  with_items:
+    - "{{ do_keys }}"
+
+- name: "Create droplets"
+  digital_ocean:
+    backups_enabled: "{{ item.backups_enabled | d('no') }}"
+    command: droplet
+    image_id: "{{ item.image_id | d('ubuntu-16-04-x64') }}"
+    name: "{{ item.name }}"
+    private_networking: "{{ item.private_networking | d('no') }}"
+    region_id: "{{ item.region_id | d('fra1') }}"
+    size_id: "{{ item.size_id | d('512mb') }}"
+    ssh_key_ids: "{{ ssh_keys | json_query('results[*].ssh_key') | selectattr('name', 'equalto', item.ssh_key_name) | map(attribute='id') | list }}"
+    state: active
+    unique_name: yes
+    user_data: "{{ lookup('template', 'user-data.j2') | trim }}"
+    virtio: "{{ item.virtio | d('yes') }}"
+    wait: "{{ item.wait | d('yes') }}"
+    wait_timeout: "{{ item.wait_timeout | d(600) }}"
+  with_items: "{{ do_droplets }}"
+  register: result_droplets
+
+- name: "Extract droplet information"
+  set_fact: do_droplets_with_ip="{{ result_droplets | json_query(droplet_query) }}"
+  vars:
+    droplet_query: "results[*].{ ip: droplet.ip_address, port: item.port, name: droplet.name, user: item.user, ssh_key_name: item.ssh_key_name }"
+  changed_when: no
+
+- name: "Wait for ssh port to become available"
+  local_action: "wait_for port={{ item.port }} host={{ item.ip }}"
+  with_items: "{{ do_droplets_with_ip }}"
+
+- name: "Add digitalocean group to inventory"
+  lineinfile:
+    dest: "{{ do_inventory_file }}"
+    line: "[digitalocean]"
+  when: do_inventory_file is defined and do_inventory_file
+
+- name: "Add droplets to inventory"
+  lineinfile:
+    dest: "{{ do_inventory_file }}"
+    regexp: "^{{ item.name }} ansible_host=.*"
+    line: "{{ item.name }} ansible_host={{ item.ip }} ansible_user={{ item.user }} ansible_port={{ item.port }}"
+    insertafter: "\\[digitalocean\\]"
+  with_items: "{{ do_droplets_with_ip }}"
+  when: do_inventory_file is defined and do_inventory_file
+
+- name: "Add droplets to hosts file"
+  become: true
+  lineinfile:
+    dest: "{{ do_hosts_file }}"
+    regexp: ".*{{ item.name }}$"
+    line: "{{ item.ip }}\t{{ item.name }}"
+    state: present
+  with_items: "{{ do_droplets_with_ip }}"
+  when: do_hosts_file is defined and do_inventory_file
+
+- name: "Read remote public key"
+  command: "ssh-keyscan -t ecdsa-sha2-nistp256 -p {{ item.port }} {{ item.name }} "
+  with_items: "{{ do_droplets_with_ip }}"
+  register: remote_pub_keys
+  changed_when: no
+
+# module known_hosts does not overwrite existing entries: delete it first
+- name: "Add droplets to known_hosts"
+  lineinfile:
+    name: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts"
+    regexp: "^{{ item.split(' ')[0] }}"
+    line: "{{ item }}"
+    state: 'present'
+  with_items: "{{ remote_pub_keys | json_query('results[*].stdout_lines') }}"
+  changed_when: no
+
+
+- name: "Add droplet to ~/.ssh/config"
+  blockinfile:
+    name: "{{ lookup('env', 'HOME') }}/.ssh/config"
+    block: |
+      Host {{ item.name }}
+        HostName {{ item.name }}
+        Port {{ item.port }}
+        User {{ item.user }}
+        IdentityFile {{ do_keys | selectattr('name', 'equalto', item.ssh_key_name) | map(attribute='pub_key_file') | list | first | regex_replace('.pub$','') }}
+    create: yes
+  with_items: "{{ do_droplets_with_ip }}"
+
+- name: "Refreshing in-memory inventory"
+  meta: refresh_inventory

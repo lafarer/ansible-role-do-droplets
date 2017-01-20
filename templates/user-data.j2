@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+# Necessary to allow ansible to connect via ssh
+apt-get install -y python-minimal
+
+# ------------------------------------------------------------------------------
+# Initial Server Setup with Ubuntu 16.04
+# https://www.digitalocean.com/community/tutorials/initial-server-setup-with-ubuntu-16-04
+# ------------------------------------------------------------------------------
+
+newuser="{{ item.user | d(lookup('env', 'USER')) }}"
+# Create a New User
+adduser $newuser
+
+# Root Privileges
+usermod -aG sudo {{ item.user | d(lookup('env', 'USER')) }}
+echo "$newuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$newuser
+
+# Add Public Key Authentication
+mkdir -p /home/$newuser/.ssh
+
+
+echo {{ ssh_keys | json_query('results[*].ssh_key') | selectattr('name', 'equalto', item.ssh_key_name) | map(attribute='public_key') | list | first }} >> /home/$newuser/.ssh/authorized_keys
+
+# Disable root login and password authentication
+sed -i 's/^PermitRootLogin[:space:]*.*/PermitRootLogin no/g' /etc/ssh/sshd_config
+sed -i 's/^PasswordAuthentication[:space:]*.*/PasswordAuthentication no/g' /etc/ssh/sshd_config
+sed -i 's/^PubkeyAuthentication[:space:]*.*/PubkeyAuthentication yes/g' /etc/ssh/sshd_config
+sed -i 's/^ChallengeResponseAuthentication[:space:]*.*/ChallengeResponseAuthentication no/g' /etc/ssh/sshd_config
+
+# Change ssh port
+sed -i 's/^Port[:space:]*.*/Port {{ item.port | d(22) }}/g' /etc/ssh/sshd_config
+
+service ssh restart

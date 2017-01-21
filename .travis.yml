@@ -1,39 +1,62 @@
----
-# Use the new container infrastructure
-sudo: false
-
+sudo: required
+dist: trusty
 language: python
-python: "2.7"
-
+python: '2.7'
 env:
-  - ANSIBLE_VERSION=latest
-  - ANSIBLE_VERSION=2.2.0.0
-  - ANSIBLE_VERSION=2.1.3
-  - ANSIBLE_VERSION=2.1.2
-
+- ANSIBLE_VERSION=latest
+- ANSIBLE_VERSION=2.2.0.0
+- ANSIBLE_VERSION=2.1.3
+- ANSIBLE_VERSION=2.1.2
+- ANSIBLE_VERSION=2.1.1.0
+- ANSIBLE_VERSION=2.1.0.0
+- ANSIBLE_VERSION=2.0.2.0
+- ANSIBLE_VERSION=2.0.1.0
+- ANSIBLE_VERSION=2.0.0.2
+- ANSIBLE_VERSION=2.0.0.1
+- ANSIBLE_VERSION=2.0.0.0
+- ANSIBLE_VERSION=1.9.6
+- ANSIBLE_VERSION=1.9.5
+- ANSIBLE_VERSION=1.9.4
+- ANSIBLE_VERSION=1.9.3
+- ANSIBLE_VERSION=1.9.2
+- ANSIBLE_VERSION=1.9.1
+- ANSIBLE_VERSION=1.9.0.1
+- ANSIBLE_VERSION=1.8.4
+- ANSIBLE_VERSION=1.8.3
+- ANSIBLE_VERSION=1.8.2
+- ANSIBLE_VERSION=1.8.1
+- ANSIBLE_VERSION=1.8
+- ANSIBLE_VERSION=1.7.2
+- ANSIBLE_VERSION=1.7.1
+- ANSIBLE_VERSION=1.7
+- ANSIBLE_VERSION=1.6.9
+- ANSIBLE_VERSION=1.6.8
+- ANSIBLE_VERSION=1.6.7
+- ANSIBLE_VERSION=1.6.6
+- ANSIBLE_VERSION=1.6.5
+- ANSIBLE_VERSION=1.6.4
+- ANSIBLE_VERSION=1.6.3
+- ANSIBLE_VERSION=1.6.2
+- ANSIBLE_VERSION=1.6.10
+- ANSIBLE_VERSION=1.6.1
+- ANSIBLE_VERSION=1.6
 branches:
   only:
-    - master
-
-# Install ansible
-addons:
-  apt:
-    packages:
-    - python-pip
-
+  - master
+before_install:
+- sudo apt-get update -qq
 install:
-  # Install Ansible.
-  - if [ "$ANSIBLE_VERSION" = "latest" ]; then pip install --no-binary ansible ansible; else pip install --no-binary ansible ansible==$ANSIBLE_VERSION; fi
-
-  # Check ansible version
-  - ansible --version
-
-  # Create ansible.cfg with correct roles_path
-  - printf '[defaults]\nroles_path=../' >ansible.cfg
-
+- if [ "$ANSIBLE_VERSION" = "latest" ]; then pip install --no-binary ansible ansible;
+  else pip install --no-binary ansible ansible==$ANSIBLE_VERSION; fi
+- ansible --version
+- printf '[defaults]\nroles_path=../' >ansible.cfg
 script:
-  # Basic role syntax check
-  - ansible-playbook tests/test.yml -i tests/inventory --syntax-check
-
+- ansible-playbook tests/test.yml -i tests/inventory --syntax-check
 notifications:
   webhooks: https://galaxy.ansible.com/api/v1/notifications/
+  hipchat:
+    rooms:
+      secure: KCO+kDcEjNfIEByNIqVwSEDWHqsu5+VEURkBTbfQF3TdV71Tp1CIb3/wbGnwQgsC1U8GkdeErS2hvt6vxrRy8nViWsDedorf2xL13/ACjhsCvozio7PAvE25xyhcSQCK7trJPRHMM54S3IMTdTFLuQ1R0SYvoOfMajlDKeQ+fgMpDBG90vH4XBZOT4ZujnWuGjWAmcpjAa0kNnbnL4f8vuIsswVS/VEb6GSQ/dPZlMxTuFz+Inju07Lb9rjlTbwpc6xvJ2tbzBRKsopEklIf7VhyuFk+Y0gbKycV+mzV31UFnnklFH84hOqUD1z6n+OCygRWqi6BdmKkXhxbpH3M2sSGDhlx/wTP8b7s1v66j/W9ONgyIl/56+LMUlREGW8z/k1KJSCT7twDl9bBp23sUEcJ6/z3oCgFnVQEBJxdINtbE/1CAgkc5V4tpS4LOLTcN+MtnPu1y3QBKZ6w+ItfwXc2aYXOELMRZzJEy6mrdgA4Zc+gtE+BDOaiuUq4/hgHHuqLbjFzfZ9o994NF27lGxpg7gtTePAH59Fm25sZpGDKGHmUnNA5dlgAFdkww/F9MzcmsjBJePAFStIpM4BgRHWa5pn3VK3T115I/eL7yqSjRZWfeg1NOeD/24qgs263MRyoBmhe/8gWjuJ1xrvBQ+eZUtFDJ0XfiJhq0xjZwW0=
+    template:
+      - '%{repository}#%{build_number} (%{branch} - %{commit} : %{author}): %{message}'
+    notify: true

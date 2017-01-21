@@ -12,7 +12,6 @@
         port: 4222
         user: admin
         ssh_key_name: admin@example.com
-    do_inventory_file: ~/.ansible/hosts
 
   roles:
-    - ../../
+    - ansible-role-do-droplets

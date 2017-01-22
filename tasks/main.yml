@@ -70,6 +70,14 @@
   changed_when: no
 
 # module known_hosts does not overwrite existing entries: delete it first
+- name: "Remove droplets to known_hosts"
+  lineinfile:
+    name: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts"
+    regexp: "^{{ item.split(' ')[0] }}"
+    line: "{{ item }}"
+    state: 'absent'
+  with_items: "{{ remote_pub_keys | json_query('results[*].stdout_lines') }}"
+  changed_when: no
 - name: "Add droplets to known_hosts"
   lineinfile:
     name: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts"
@@ -78,7 +86,6 @@
     state: 'present'
   with_items: "{{ remote_pub_keys | json_query('results[*].stdout_lines') }}"
   changed_when: no
-
 
 - name: "Add droplet to ~/.ssh/config"
   blockinfile:
